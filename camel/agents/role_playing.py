@@ -44,7 +44,7 @@ class RolePlaying:
             agent. (default: :obj:`False`)
         with_critic_in_the_loop (bool, optional): Whether to include a critic
             in the loop. (default: :obj:`False`)
-        model_type (ModelType, optional): The type of backend model to use.
+        model (ModelType, optional): The type of backend model to use.
             (default: :obj:`ModelType.GPT_3_5_TURBO`)
         task_type (TaskType, optional): The type of task to perform.
             (default: :obj:`TaskType.AI_SOCIETY`)
@@ -80,7 +80,7 @@ class RolePlaying:
             with_task_planner: bool = False,
             with_critic_in_the_loop: bool = False,
             critic_criteria: Optional[str] = None,
-            model_type: ModelType = ModelType.GPT_3_5_TURBO,
+            model: ModelType = ModelType.GPT_3_5_TURBO.value,
             task_type: TaskType = TaskType.AI_SOCIETY,
             assistant_agent_kwargs: Optional[Dict] = None,
             user_agent_kwargs: Optional[Dict] = None,
@@ -94,7 +94,7 @@ class RolePlaying:
         self.with_task_specify = with_task_specify
         self.with_task_planner = with_task_planner
         self.with_critic_in_the_loop = with_critic_in_the_loop
-        self.model_type = model_type
+        self.model = model
         self.task_type = task_type
 
         if with_task_specify:
@@ -107,7 +107,7 @@ class RolePlaying:
                 task_specify_meta_dict.update(extend_task_specify_meta_dict)
 
             task_specify_agent = TaskSpecifyAgent(
-                self.model_type,
+                self.model,
                 task_type=self.task_type,
                 **(task_specify_agent_kwargs or {}),
             )
@@ -121,7 +121,7 @@ class RolePlaying:
 
         if with_task_planner:
             task_planner_agent = TaskPlannerAgent(
-                self.model_type,
+                self.model,
                 **(task_planner_agent_kwargs or {}),
             )
             self.planned_task_prompt = task_planner_agent.step(task_prompt)
@@ -149,9 +149,9 @@ class RolePlaying:
                                           meta_dict=sys_msg_meta_dicts[1],
                                           content=user_role_prompt.format(**sys_msg_meta_dicts[1]))
 
-        self.assistant_agent: ChatAgent = ChatAgent(self.assistant_sys_msg, model_type,
+        self.assistant_agent: ChatAgent = ChatAgent(self.assistant_sys_msg, model,
                                                     **(assistant_agent_kwargs or {}), )
-        self.user_agent: ChatAgent = ChatAgent(self.user_sys_msg, model_type, **(user_agent_kwargs or {}), )
+        self.user_agent: ChatAgent = ChatAgent(self.user_sys_msg, model, **(user_agent_kwargs or {}), )
 
         if with_critic_in_the_loop:
             raise ValueError("with_critic_in_the_loop not available")
@@ -163,7 +163,7 @@ class RolePlaying:
             #                                 **sys_msg_meta_dicts[0])
             #     self.critic_sys_msg = sys_msg_generator.from_dict(critic_msg_meta_dict,
             #                                                       role_tuple=(critic_role_name, RoleType.CRITIC), )
-            #     self.critic = CriticAgent(self.critic_sys_msg, model_type, **(critic_kwargs or {}), )
+            #     self.critic = CriticAgent(self.critic_sys_msg, model, **(critic_kwargs or {}), )
         else:
             self.critic = None
 

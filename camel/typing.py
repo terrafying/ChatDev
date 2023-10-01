@@ -42,18 +42,6 @@ class RoleType(Enum):
     CHATDEV_TESTER = "software test engineer"
     CHATDEV_CCO = "chief creative officer (CCO)"
 
-
-class ModelType(Enum):
-    GPT_3_5_TURBO = "gpt-3.5-turbo-16k-0613"
-    GPT_4 = "gpt-4"
-    GPT_4_32k = "gpt-4-32k"
-    STUB = "stub"
-
-    @property
-    def value_for_tiktoken(self):
-        return self.value if self.name != "STUB" else "gpt-3.5-turbo-16k-0613"
-
-
 class PhaseType(Enum):
     REFLECTION = "reflection"
     RECRUITING_CHRO = "recruiting CHRO"
@@ -79,4 +67,4 @@ class PhaseType(Enum):
     CREATING_USER_MANUAL = "user manual"
 
 
-__all__ = ["TaskType", "RoleType", "ModelType", "PhaseType"]
+__all__ = ["TaskType", "RoleType", "PhaseType"]

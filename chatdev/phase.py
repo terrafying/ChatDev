@@ -18,7 +18,7 @@ class Phase(ABC):
                  phase_prompt,
                  role_prompts,
                  phase_name,
-                 model_type,
+                 model,
                  log_filepath):
         """
 
@@ -42,7 +42,7 @@ class Phase(ABC):
         self.timeout_seconds = 1.0
         self.max_retries = 3
         self.reflection_prompt = """Here is a conversation between two roles: {conversations} {question}"""
-        self.model_type = model_type
+        self.model = model
         self.log_filepath = log_filepath
 
     @log_arguments
@@ -59,7 +59,7 @@ class Phase(ABC):
             task_type=TaskType.CHATDEV,
             need_reflect=False,
             with_task_specify=False,
-            model_type=ModelType.GPT_3_5_TURBO,
+            model=ModelType.GPT_3_5_TURBO,
             placeholders=None,
             chat_turn_limit=10
     ) -> str:
@@ -77,7 +77,7 @@ class Phase(ABC):
             task_type: task type
             need_reflect: flag for checking reflection
             with_task_specify: with task specify
-            model_type: model type
+            model: model type
             placeholders: placeholders for phase environment to generate phase prompt
             chat_turn_limit: turn limits in each chat
 
@@ -103,7 +103,7 @@ class Phase(ABC):
             task_prompt=task_prompt,
             task_type=task_type,
             with_task_specify=with_task_specify,
-            model_type=model_type,
+            model=model,
         )
 
         # log_and_print_online("System", role_play_session.assistant_sys_msg)
@@ -230,7 +230,7 @@ class Phase(ABC):
                           placeholders={"conversations": messages, "question": question},
                           need_reflect=False,
                           chat_turn_limit=1,
-                          model_type=self.model_type)
+                          model=self.model)
 
         if "recruiting" in phase_name:
             if "Yes".lower() in reflected_content.lower():
@@ -302,7 +302,7 @@ class Phase(ABC):
                           user_role_prompt=self.user_role_prompt,
                           chat_turn_limit=chat_turn_limit,
                           placeholders=self.phase_env,
-                          model_type=self.model_type)
+                          model=self.model)
         chat_env = self.update_chat_env(chat_env)
         return chat_env
 
@@ -519,7 +519,7 @@ class CodeReviewHuman(Phase):
                           user_role_prompt=self.user_role_prompt,
                           chat_turn_limit=chat_turn_limit,
                           placeholders=self.phase_env,
-                          model_type=self.model_type)
+                          model=self.model)
         chat_env = self.update_chat_env(chat_env)
         return chat_env
 

@@ -27,7 +27,7 @@ class ChatChain:
                  task_prompt: str = None,
                  project_name: str = None,
                  org_name: str = None,
-                 model_type: ModelType = ModelType.GPT_3_5_TURBO) -> None:
+                 model: str = None) -> None:
         """
 
         Args:
@@ -45,7 +45,6 @@ class ChatChain:
         self.config_role_path = config_role_path
         self.project_name = project_name
         self.org_name = org_name
-        self.model_type = model_type
 
         with open(self.config_path, 'r', encoding="utf8") as file:
             self.config = json.load(file)
@@ -54,6 +53,7 @@ class ChatChain:
         with open(self.config_role_path, 'r', encoding="utf8") as file:
             self.config_role = json.load(file)
 
+        self.model = self.config.get('model', model)
         # init chatchain config and recruitments
         self.chain = self.config["chain"]
         self.recruitments = self.config["recruitments"]
@@ -93,12 +93,13 @@ class ChatChain:
             user_role_name = self.config_phase[phase]['user_role_name']
             phase_prompt = "\n\n".join(self.config_phase[phase]['phase_prompt'])
             phase_class = getattr(self.phase_module, phase)
+            model = self.config_phase[phase].get('model', self.model)
             phase_instance = phase_class(assistant_role_name=assistant_role_name,
                                          user_role_name=user_role_name,
                                          phase_prompt=phase_prompt,
                                          role_prompts=self.role_prompts,
                                          phase_name=phase,
-                                         model_type=self.model_type,
+                                         model=model,
                                          log_filepath=self.log_filepath)
             self.phases[phase] = phase_instance
 
@@ -147,7 +148,7 @@ class ChatChain:
                                                          composition=composition,
                                                          config_phase=self.config_phase,
                                                          config_role=self.config_role,
-                                                         model_type=self.model_type,
+                                                         model=phase_item.get('model', self.model),
                                                          log_filepath=self.log_filepath)
             self.chat_env = compose_phase_instance.execute(self.chat_env)
         else:
@@ -300,7 +301,7 @@ then you should return a message in a format like \"<INFO> revised_version_of_th
             task_type=TaskType.CHATDEV,
             task_prompt="Do prompt engineering on user query",
             with_task_specify=False,
-            model_type=self.model_type,
+            model=self.model,
         )
 
         # log_and_print_online("System", role_play_session.assistant_sys_msg)

@@ -14,6 +14,7 @@
 import os
 import re
 import zipfile
+import litellm
 from functools import wraps
 from typing import Any, Callable, List, Optional, Set, TypeVar
 
@@ -56,14 +57,14 @@ def count_tokens_openai_chat_models(
 
 def num_tokens_from_messages(
         messages: List[OpenAIMessage],
-        model: ModelType,
+        model: str,
 ) -> int:
     r"""Returns the number of tokens used by a list of messages.
 
     Args:
         messages (List[OpenAIMessage]): The list of messages to count the
             number of tokens for.
-        model (ModelType): The OpenAI model used to encode the messages.
+        model (str): The model used to encode the messages.  Format is either "gpt-3.5-turbo", or "<backend>/<prefix>/<model_name>", e.g. "huggingface/codellama/CodeLlama-7b-Instruct-hf".
 
     Returns:
         int: The total number of tokens used by the messages.
@@ -76,16 +77,23 @@ def num_tokens_from_messages(
         - https://platform.openai.com/docs/models/gpt-4
         - https://platform.openai.com/docs/models/gpt-3-5
     """
-    try:
-        value_for_tiktoken = model.value_for_tiktoken
-        encoding = tiktoken.encoding_for_model(value_for_tiktoken)
-    except KeyError:
-        encoding = tiktoken.get_encoding("cl100k_base")
+    
+    # count litellm tokens
+    if '/' in model:
+        return litellm.token_counter(model, messages=messages)
 
+   
     if model in {
-        ModelType.GPT_3_5_TURBO, ModelType.GPT_4, ModelType.GPT_4_32k,
-        ModelType.STUB
+        ModelType.GPT_3_5_TURBO.value, ModelType.GPT_4.value, ModelType.GPT_4_32k.value,
+        ModelType.STUB.value
     }:
+        try:
+            value_for_tiktoken = "gpt-3.5-turbo-16k-0613"
+            encoding = tiktoken.encoding_for_model(value_for_tiktoken)
+        except KeyError:
+            encoding = tiktoken.get_encoding("cl100k_base")
+
+
         return count_tokens_openai_chat_models(messages, encoding)
     else:
         raise NotImplementedError(
@@ -116,7 +124,8 @@ def get_model_token_limit(model: ModelType) -> int:
     elif model == ModelType.STUB:
         return 4096
     else:
-        raise ValueError("Unknown model type")
+        print("Hack!")
+        return 8192
 
 
 def openai_api_key_required(func: F) -> F:

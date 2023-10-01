@@ -14,7 +14,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from tenacity import retry
+from tenacity import retry, retry_if_exception_type
 from tenacity.stop import stop_after_attempt
 from tenacity.wait import wait_exponential
 
@@ -87,8 +87,12 @@ class ChatAgent(BaseAgent):
         self.system_message: SystemMessage = system_message
         self.role_name: str = system_message.role_name
         self.role_type: RoleType = system_message.role_type
-        self.model: ModelType = (model if model is not None else ModelType.GPT_3_5_TURBO)
+        self.model: str = (model if model is not None else ModelType.GPT_3_5_TURBO)
         self.model_config: ChatGPTConfig = model_config or ChatGPTConfig()
+        if 'model' in self.model_config.__dict__:
+            
+            self.model = self.model_config.model
+        
         self.model_token_limit: int = get_model_token_limit(self.model)
         self.message_window_size: Optional[int] = message_window_size
         self.model_backend: ModelBackend = ModelFactory.create(self.model, self.model_config.__dict__)
@@ -153,7 +157,7 @@ class ChatAgent(BaseAgent):
         self.stored_messages.append(message)
         return self.stored_messages
 
-    @retry(wait=wait_exponential(min=5, max=60), stop=stop_after_attempt(5))
+    @retry(wait=wait_exponential(min=5, max=60), stop=stop_after_attempt(3), retry=retry_if_exception_type(TimeoutError))
     @openai_api_key_required
     def step(
             self,
@@ -189,6 +193,7 @@ class ChatAgent(BaseAgent):
 
         if num_tokens < self.model_token_limit:
             response = self.model_backend.run(messages=openai_messages)
+
             if not isinstance(response, dict):
                 raise RuntimeError("OpenAI returned unexpected struct")
             output_messages = [
@@ -217,6 +222,7 @@ class ChatAgent(BaseAgent):
                 ["max_tokens_exceeded_by_camel"],
                 num_tokens,
             )
+            print("[!!] max_tokens_exceeded_by_camel")
 
         return ChatAgentResponse(output_messages, self.terminated, info)
 

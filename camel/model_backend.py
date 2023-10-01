@@ -20,6 +20,8 @@ import tiktoken
 
 from camel.typing import ModelType
 from chatdev.utils import log_and_print_online
+from tenacity import retry, wait_exponential
+
 
 
 class ModelBackend(ABC):
@@ -43,14 +45,15 @@ class ModelBackend(ABC):
 class OpenAIModel(ModelBackend):
     r"""OpenAI API in a unified ModelBackend interface."""
 
-    def __init__(self, model_type: ModelType, model_config_dict: Dict) -> None:
+    def __init__(self, model: str, model_config_dict: Dict) -> None:
         super().__init__()
-        self.model_type = model_type
+        self.model = model
         self.model_config_dict = model_config_dict
 
+    # @retry(wait=wait_exponential(multiplier=0.04, max=10))
     def run(self, *args, **kwargs) -> Dict[str, Any]:
         string = "\n".join([message["content"] for message in kwargs["messages"]])
-        encoding = tiktoken.encoding_for_model(self.model_type.value)
+        encoding = tiktoken.encoding_for_model(self.model)
         num_prompt_tokens = len(encoding.encode(string))
         gap_between_send_receive = 15 * len(kwargs["messages"])
         num_prompt_tokens += gap_between_send_receive
@@ -64,11 +67,11 @@ class OpenAIModel(ModelBackend):
             "gpt-4-0613": 8192,
             "gpt-4-32k": 32768,
         }
-        num_max_token = num_max_token_map[self.model_type.value]
+        num_max_token = num_max_token_map[self.model]
         num_max_completion_tokens = num_max_token - num_prompt_tokens
         self.model_config_dict['max_tokens'] = num_max_completion_tokens
-        response = litellm.completion(*args, **kwargs,
-                                                model=self.model_type.value,
+        response = openai.completion(*args, **kwargs,
+                                                model=self.model,
                                                 **self.model_config_dict)
 
         log_and_print_online(
@@ -79,6 +82,40 @@ class OpenAIModel(ModelBackend):
             raise RuntimeError("Unexpected return from OpenAI API")
         return response
 
+class LiteLLMModel(ModelBackend):
+    def __init__(self, model: str, model_config_dict: Dict) -> None:
+        super().__init__()
+        self.model = model
+        self.model_config_dict = model_config_dict
+
+    # @retry(wait=wait_exponential(multiplier=0.04, max=10))
+    def run(self, *args, **kwargs) -> Dict[str, Any]:
+        num_prompt_tokens = litellm.token_counter(self.model, messages=kwargs["messages"])
+        gap_between_send_receive = 15 * len(kwargs["messages"])
+        num_prompt_tokens += gap_between_send_receive
+
+        num_max_token = self.model_config_dict.get('max_tokens', 8192) or 8192
+        # if not num_max_token:
+        #     num_max_token = litellm.get_max_tokens(self.model)
+        num_max_completion_tokens = num_max_token - num_prompt_tokens
+        self.model_config_dict['max_tokens'] = num_max_completion_tokens
+        if 'model' in kwargs:
+            model = kwargs['model']
+        else:
+            model = self.model
+        # print(f'LLM running with model: {model}, kwargs: {str(kwargs)}')
+        response = litellm.completion(*args, **kwargs,
+                                                model=model,
+                                                **self.model_config_dict)
+
+        
+        log_and_print_online(
+            "**[LLM_Usage_Info Receive]**\nprompt_tokens: {}\ncompletion_tokens: {}\ntotal_tokens: {}\n".format(
+                response["usage"]["prompt_tokens"], response["usage"]["completion_tokens"],
+                response["usage"]["total_tokens"]))
+        if not isinstance(response, Dict):
+            raise RuntimeError("Unexpected return from OpenAI API")
+        return response
 
 class StubModel(ModelBackend):
     r"""A dummy model used for unit tests."""
@@ -107,22 +144,23 @@ class ModelFactory:
     """
 
     @staticmethod
-    def create(model_type: ModelType, model_config_dict: Dict) -> ModelBackend:
-        default_model_type = ModelType.GPT_3_5_TURBO
+    def create(model: str, model_config_dict: Dict) -> ModelBackend:
+        default_model = "gpt-3.5-turbo"
 
-        if model_type in {
-            ModelType.GPT_3_5_TURBO, ModelType.GPT_4, ModelType.GPT_4_32k,
-            None
+        if model in {
+            "gpt-3.5-turbo","gpt-3.5-turbo-0613","gpt-3.5-turbo-16k","gpt-3.5-turbo-16k-0613","gpt-4","gpt-4-0613","gpt-4-32k",
         }:
-            model_class = OpenAIModel
-        elif model_type == ModelType.STUB:
+            model_class = LiteLLMModel
+        elif "/" in model:
+            model_class = LiteLLMModel
+        elif model == ModelType.STUB:
             model_class = StubModel
         else:
             raise ValueError("Unknown model")
 
-        if model_type is None:
-            model_type = default_model_type
+        if model is None:
+            model = default_model
 
-        # log_and_print_online("Model Type: {}".format(model_type))
-        inst = model_class(model_type, model_config_dict)
+        # log_and_print_online("Model Type: {}".format(model))
+        inst = model_class(model, model_config_dict)
         return inst
